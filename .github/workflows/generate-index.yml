@@ -1,0 +1,35 @@
+name: Generate Posts Index
+
+on:
+  push:
+    paths:
+      - 'posts/*.md'
+      - '.github/workflows/generate-index.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate posts.json
+        run: |
+          if [ -d "posts" ]; then
+            cd posts
+            # Find all .md files and output them as a JSON array
+            ls -1 *.md 2>/dev/null | jq -R . | jq -s . > ../posts.json || echo "[]" > ../posts.json
+          else
+            echo "[]" > posts.json
+          fi
+
+      - name: Commit and push posts.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add posts.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "auto: update posts.json index" && git push)

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Blog</title>
+  
+  <style>
+    :root {
+      --bg: #f9f9fb;
+      --card-bg: #ffffff;
+      --text: #2d3748;
+      --muted: #718096;
+      --accent: #3182ce;
+      --border: #e2e8f0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    header p {
+      color: var(--muted);
+      margin: 0.5rem 0 0 0;
+    }
+
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .post {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .post-date {
+      font-size: 0.875rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .post-content img {
+      max-width: 100%;
+      border-radius: 4px;
+    }
+
+    .post-content code {
+      background: #edf2f7;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    .post-content pre code {
+      display: block;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+
+    #loading {
+      text-align: center;
+      color: var(--muted);
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>Daily Blog</h1>
+    <p>Thoughts, updates, and daily logs.</p>
+  </header>
+
+  <main id="blog-posts">
+    <div id="loading">Loading posts...</div>
+  </main>
+
+  <script>
+    function formatDate(dateString) {
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    function parseFilename(filename) {
+      const nameWithoutExt = filename.replace(/\.md$/, '');
+      const lastUnderscore = nameWithoutExt.lastIndexOf('_');
+      
+      if (lastUnderscore === -1) {
+        return { date: '', file: filename };
+      }
+
+      const rawDate = nameWithoutExt.substring(lastUnderscore + 1);
+      return {
+        date: rawDate,
+        file: filename
+      };
+    }
+
+    async function loadPosts() {
+      const container = document.getElementById('blog-posts');
+      
+      try {
+        // Fetch auto-generated index file
+        const indexResponse = await fetch('./posts.json');
+        if (!indexResponse.ok) throw new Error('Could not load posts.json index');
+        
+        const postsList = await indexResponse.json();
+        container.innerHTML = '';
+
+        if (!Array.isArray(postsList) || postsList.length === 0) {
+          container.innerHTML = '<p>No posts found.</p>';
+          return;
+        }
+
+        // Sort files by date descending (newest first)
+        const sortedPosts = postsList.sort((a, b) => {
+          const dateA = parseFilename(a).date;
+          const dateB = parseFilename(b).date;
+          return dateB.localeCompare(dateA);
+        });
+
+        for (const filename of sortedPosts) {
+          try {
+            const response = await fetch(`./posts/${filename}`);
+            if (!response.ok) continue;
+            
+            const markdownText = await response.text();
+            const { date } = parseFilename(filename);
+
+            const postElement = document.createElement('article');
+            postElement.className = 'post';
+
+            const formattedDate = date ? formatDate(date) : '';
+            
+            postElement.innerHTML = `
+              ${formattedDate ? `<div class="post-date">${formattedDate}</div>` : ''}
+              <div class="post-content">${marked.parse(markdownText)}</div>
+            `;
+
+            container.appendChild(postElement);
+          } catch (err) {
+            console.error(`Error loading ${filename}:`, err);
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        container.innerHTML = '<p>Failed to load posts index. Ensure posts.json exists.</p>';
+      }
+    }
+
+    loadPosts();
+  </script>
+
+</body>
+</html>
